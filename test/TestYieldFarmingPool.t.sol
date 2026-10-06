@@ -270,4 +270,68 @@ contract YieldFarmingPoolTest is Test {
         (uint256 remaining,,) = yieldPool.userInfo(poolId, user1);
         assert(remaining == stakeAmt - withdrawAmt);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // claim
+    // ─────────────────────────────────────────────────────────────
+
+    function test_claim_success() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 100);
+        uint256 rewardsBefore = rewardToken.balanceOf(user1);
+        vm.startPrank(user1);
+        yieldPool.claim(poolId);
+        vm.stopPrank();
+        assert(rewardToken.balanceOf(user1) > rewardsBefore);
+    }
+
+    function test_claim_revertsNoRewards() public {
+        vm.startPrank(user1);
+        vm.expectRevert(bytes("No rewards to claim"));
+        yieldPool.claim(poolId);
+        vm.stopPrank();
+    }
+
+    function test_claim_updatesLastClaimTime() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 100);
+        vm.startPrank(user1);
+        yieldPool.claim(poolId);
+        vm.stopPrank();
+        (,, uint256 lastClaimTime) = yieldPool.userInfo(poolId, user1);
+        assert(lastClaimTime == block.timestamp);
+    }
+
+    function test_claim_emitsEvent() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 100);
+        vm.startPrank(user1);
+        vm.expectEmit(true, true, false, false);
+        emit RewardClaimed(poolId, user1, 0);
+        yieldPool.claim(poolId);
+        vm.stopPrank();
+    }
+
+    function test_claim_capsRewardsAtContractBalance() public {
+        // Leave only 1 wei of rewards → pending >> balance → amount gets capped
+        uint256 bal = rewardToken.balanceOf(address(yieldPool));
+        vm.startPrank(owner);
+        yieldPool.emergencyWithdraw(address(rewardToken), bal - 1);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 1000000);
+        vm.startPrank(user1);
+        yieldPool.claim(poolId);
+        vm.stopPrank();
+        assert(rewardToken.balanceOf(user1) == 1);
+        assert(rewardToken.balanceOf(address(yieldPool)) == 0);
+    }
 }
