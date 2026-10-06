@@ -104,7 +104,7 @@ contract YieldFarmingPool is ReentrancyGuard, Ownable {
         if (user.amount > 0) {
             uint256 pending = _calculatePendingRewards(poolId, msg.sender);
             if (pending > 0) {
-                _safeRewardsTransfer(msg.sender, pending);
+                _safeRewardTransfer(msg.sender, pending);
                 emit RewardClaimed(poolId, msg.sender, pending);
             }
         }
@@ -135,7 +135,7 @@ contract YieldFarmingPool is ReentrancyGuard, Ownable {
 
         uint256 pending = _calculatePendingRewards(poolId, msg.sender);
         if (pending > 0) {
-            _safeRewardsTransfer(msg.sender, pending);
+            _safeRewardTransfer(msg.sender, pending);
             emit RewardClaimed(poolId, msg.sender, pending);
         }
 
@@ -193,7 +193,7 @@ contract YieldFarmingPool is ReentrancyGuard, Ownable {
         
         encodedData = abi.encodePacked(
             pool.token,
-            pool.tokenStaked,
+            pool.totalStaked,
             pool.rewardRate,
             pool.lastUpdateTime,
             pool.rewardPerTokenStored,
@@ -251,4 +251,41 @@ contract YieldFarmingPool is ReentrancyGuard, Ownable {
 
         pool.lastUpdateTime = block.timestamp;
     } 
+
+    /**
+     * @dev Safely transfer rewards
+     * @param to Recipient address 
+     * @param amount Amount to transfer
+     */
+    function _safeRewardTransfer(address to, uint256 amount) internal {
+        uint256 rewardBalance = rewardToken.balanceOf(address(this));
+        if (amount > rewardBalance) {
+            amount = rewardBalance;
+        }
+
+        if (amount > 0) {
+            rewardToken.safeTransfer(to, amount);
+        }
+    }
+
+    /**
+     * @dev Calculate the pending rewards of a user
+     * @param poolId Pool identifier
+     * @param user User address 
+     * @return Amount of pending rewards
+     */
+    function _calculatePendingRewards(bytes32 poolId, address user) internal view returns(uint256) {
+        Pool storage pool = pools[poolId];
+        UserInfo storage userInfoData = userInfo[poolId][user];
+        
+        uint256 rewardPerTokenStored = pool.rewardPerTokenStored;
+
+        if (pool.totalStaked > 0) {
+            uint256 timeElapsed = block.timestamp - pool.lastUpdateTime;
+            uint256 rewards = timeElapsed * pool.rewardRate;
+            rewardPerTokenStored += rewards * 1e18 / pool.totalStaked;
+        }
+
+        return userInfoData.amount * rewardPerTokenStored / 1e18 - userInfoData.rewardDebt;
+    }
 }
