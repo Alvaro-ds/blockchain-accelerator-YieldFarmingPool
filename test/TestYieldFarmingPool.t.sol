@@ -136,4 +136,65 @@ contract YieldFarmingPoolTest is Test {
         yieldPool.createPool(address(stakeToken), 2e18);
         vm.stopPrank();
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // stake
+    // ─────────────────────────────────────────────────────────────
+
+    function test_stake_success() public {
+        uint256 balanceBefore = stakeToken.balanceOf(user1);
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        assert(stakeToken.balanceOf(user1) == balanceBefore - STAKE_AMOUNT);
+        assert(stakeToken.balanceOf(address(yieldPool)) == STAKE_AMOUNT);
+        (uint256 amount,,) = yieldPool.userInfo(poolId, user1);
+        assert(amount == STAKE_AMOUNT);
+        (, uint256 totalStaked,,,,) = yieldPool.pools(poolId);
+        assert(totalStaked == STAKE_AMOUNT);
+    }
+
+    function test_stake_revertsPoolNotActive() public {
+        bytes32 fakePId = keccak256("fake");
+        vm.startPrank(user1);
+        vm.expectRevert(bytes("Pool is not active"));
+        yieldPool.stake(fakePId, STAKE_AMOUNT);
+        vm.stopPrank();
+    }
+
+    function test_stake_revertsZeroAmount() public {
+        vm.startPrank(user1);
+        vm.expectRevert(bytes("Amount must be positive"));
+        yieldPool.stake(poolId, 0);
+        vm.stopPrank();
+    }
+
+    function test_stake_autoClaimsOnRestake() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 100);
+        uint256 rewardsBefore = rewardToken.balanceOf(user1);
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        assert(rewardToken.balanceOf(user1) > rewardsBefore);
+    }
+
+    function test_stake_emitsEvent() public {
+        vm.startPrank(user1);
+        vm.expectEmit(true, true, false, true);
+        emit Staked(poolId, user1, STAKE_AMOUNT);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+    }
+
+    function testFuzz_stake_updatesUserAmount(uint256 amount) public {
+        amount = bound(amount, 1, 9999e18);
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, amount);
+        vm.stopPrank();
+        (uint256 userAmount,,) = yieldPool.userInfo(poolId, user1);
+        assert(userAmount == amount);
+    }
 }
