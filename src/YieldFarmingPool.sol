@@ -167,4 +167,76 @@ contract YieldFarmingPool is ReentrancyGuard, Ownable {
 
         emit RewardClaimed(poolId, msg.sender, pending);
     }
+
+    /**
+     * @dev Update the reward rate of a pool
+     * @param poolId Pool Identifier
+     * @param newRewardRate New reward rate
+     */
+    function updatePoolRewardRate(bytes32 poolId, uint256 newRewardRate) external onlyOwner {
+        Pool storage pool = pools[poolId];
+        require(pool.isActive, "Pool is not active");
+
+        _updatePool(poolId);
+        pool.rewardRate = newRewardRate;
+
+        emit PoolUpdated(poolId, newRewardRate);
+    }
+
+    /**
+     * @dev Get encoded pool information for external use
+     * @param poolId Pool identifier
+     * @return encodedData Encoded pool data
+     */
+    function getPoolEncodedData(bytes32 poolId) external view returns(bytes memory encodedData) {
+        Pool storage pool = pools[poolId];
+        
+        encodedData = abi.encodePacked(
+            pool.token,
+            pool.tokenStaked,
+            pool.rewardRate,
+            pool.lastUpdateTime,
+            pool.rewardPerTokenStored,
+            pool.isActive
+        );
+    }
+
+    /**
+     * @dev Create a unoque hash for a user in a specific pool
+     * @param poolId Pool identifier
+     * @param user User address
+     * @return userHash Unique user hash
+     */
+    function getUserHash(bytes32 poolId, address user) external pure returns(bytes32 userHash) {
+        userHash = keccak256(abi.encodePacked(poolId, user, "YIELD_FARMING_USER"));
+    }
+
+    /** 
+     * @dev Get the total number of active pools
+     * @return Number of active pools
+     */
+    function getActivePoolsCount() external view returns(uint256) {
+        return activePools.length;
+    }
+
+    /**
+     * @dev Get all active pools
+     * @return Array with the identifiers of the active pools
+     */
+    function getActivePools() external view returns(bytes32[] memory) {
+        return activePools;
+    }
+
+    /**
+     * @dev Emergency function for the owner
+     * @param token Address of the token to rescue
+     * @param amount Amount to rescue
+     */
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(owner(), amount);
+    }
+
+    function _updatePool(bytes32 poolId) internal {
+
+    } 
 }
