@@ -236,7 +236,19 @@ contract YieldFarmingPool is ReentrancyGuard, Ownable {
         IERC20(token).safeTransfer(owner(), amount);
     }
 
+    /**
+     * @dev Update the pool state 
+     * @param poolId Pool Identifier
+     */
     function _updatePool(bytes32 poolId) internal {
+        Pool storage pool = pools[poolId];
 
+        if (pool.totalStaked > 0) {
+            uint256 timeElapsed = block.timestamp - pool.lastUpdateTime;
+            uint256 rewards = timeElapsed * pool.rewardRate;
+            pool.rewardPerTokenStored = rewards * 1e18 / pool.totalStaked; // 1e18 / 1e18 = 0 --> 1e18 * 1e18 / 1e18 = 1e18
+        }
+
+        pool.lastUpdateTime = block.timestamp;
     } 
 }
