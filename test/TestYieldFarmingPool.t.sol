@@ -197,4 +197,77 @@ contract YieldFarmingPoolTest is Test {
         (uint256 userAmount,,) = yieldPool.userInfo(poolId, user1);
         assert(userAmount == amount);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // withdraw
+    // ─────────────────────────────────────────────────────────────
+
+    function test_withdraw_success() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 100);
+        uint256 balanceBefore = stakeToken.balanceOf(user1);
+        vm.startPrank(user1);
+        yieldPool.withdraw(poolId, STAKE_AMOUNT / 2);
+        vm.stopPrank();
+        assert(stakeToken.balanceOf(user1) == balanceBefore + STAKE_AMOUNT / 2);
+        (uint256 amount,,) = yieldPool.userInfo(poolId, user1);
+        assert(amount == STAKE_AMOUNT - STAKE_AMOUNT / 2);
+    }
+
+    function test_withdraw_revertsOnExactAmount() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        vm.expectRevert(bytes("Insuficient staked amount"));
+        yieldPool.withdraw(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+    }
+
+    function test_withdraw_revertsMoreThanStaked() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        vm.expectRevert(bytes("Insuficient staked amount"));
+        yieldPool.withdraw(poolId, STAKE_AMOUNT * 2);
+        vm.stopPrank();
+    }
+
+    function test_withdraw_claimsRewards() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 100);
+        uint256 rewardsBefore = rewardToken.balanceOf(user1);
+        vm.startPrank(user1);
+        yieldPool.withdraw(poolId, STAKE_AMOUNT / 2);
+        vm.stopPrank();
+        assert(rewardToken.balanceOf(user1) > rewardsBefore);
+    }
+
+    function test_withdraw_emitsWithdrawnEvent() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 10);
+        vm.startPrank(user1);
+        vm.expectEmit(true, true, false, true);
+        emit Withdrawn(poolId, user1, STAKE_AMOUNT / 2);
+        yieldPool.withdraw(poolId, STAKE_AMOUNT / 2);
+        vm.stopPrank();
+    }
+
+    function testFuzz_withdraw_updatesBalance(uint256 stakeAmt, uint256 withdrawAmt) public {
+        stakeAmt = bound(stakeAmt, 2, 9999e18);
+        withdrawAmt = bound(withdrawAmt, 1, stakeAmt - 1);
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, stakeAmt);
+        yieldPool.withdraw(poolId, withdrawAmt);
+        vm.stopPrank();
+        (uint256 remaining,,) = yieldPool.userInfo(poolId, user1);
+        assert(remaining == stakeAmt - withdrawAmt);
+    }
 }
