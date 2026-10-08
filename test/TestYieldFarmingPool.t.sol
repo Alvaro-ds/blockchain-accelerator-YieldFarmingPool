@@ -95,6 +95,7 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(owner);
         bytes32 newPId = yieldPool.createPool(address(stakeToken), 2e18);
         vm.stopPrank();
+
         (address token,,,,, bool isActive) = yieldPool.pools(newPId);
         assert(token == address(stakeToken));
         assert(isActive);
@@ -128,6 +129,7 @@ contract YieldFarmingPoolTest is Test {
     function test_createPool_revertsAlreadyExists() public {
         vm.startPrank(owner);
         yieldPool.createPool(address(stakeToken), 2e18);
+
         vm.expectRevert(bytes("Pool already exists"));
         yieldPool.createPool(address(stakeToken), 2e18);
         vm.stopPrank();
@@ -136,9 +138,11 @@ contract YieldFarmingPoolTest is Test {
     /// @notice the active pools count increases by one after a successful createPool call.
     function test_createPool_addsToActivePools() public {
         uint256 countBefore = yieldPool.getActivePoolsCount();
+
         vm.startPrank(owner);
         yieldPool.createPool(address(stakeToken), 2e18);
         vm.stopPrank();
+
         assert(yieldPool.getActivePoolsCount() == countBefore + 1);
     }
 
@@ -146,6 +150,7 @@ contract YieldFarmingPoolTest is Test {
     function test_createPool_emitsEvent() public {
         uint256 ts = block.timestamp;
         bytes32 expectedPId = keccak256(abi.encodePacked(address(stakeToken), uint256(2e18), ts, block.chainid));
+
         vm.startPrank(owner);
         vm.expectEmit(true, true, false, true);
         emit PoolCreated(expectedPId, address(stakeToken), 2e18);
@@ -160,9 +165,11 @@ contract YieldFarmingPoolTest is Test {
     /// @notice tokens are transferred from user to contract; user.amount and pool.totalStaked are updated correctly.
     function test_stake_success() public {
         uint256 balanceBefore = stakeToken.balanceOf(user1);
+
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         assert(stakeToken.balanceOf(user1) == balanceBefore - STAKE_AMOUNT);
         assert(stakeToken.balanceOf(address(yieldPool)) == STAKE_AMOUNT);
         (uint256 amount,,) = yieldPool.userInfo(poolId, user1);
@@ -174,6 +181,7 @@ contract YieldFarmingPoolTest is Test {
     /// @notice reverts with "Pool is not active" when the pool id is not registered.
     function test_stake_revertsPoolNotActive() public {
         bytes32 fakePId = keccak256("fake");
+
         vm.startPrank(user1);
         vm.expectRevert(bytes("Pool is not active"));
         yieldPool.stake(fakePId, STAKE_AMOUNT);
@@ -193,11 +201,14 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 100);
         uint256 rewardsBefore = rewardToken.balanceOf(user1);
+
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         assert(rewardToken.balanceOf(user1) > rewardsBefore);
     }
 
@@ -208,6 +219,7 @@ contract YieldFarmingPoolTest is Test {
         uint256 rewardBefore = rewardToken.balanceOf(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         assert(rewardToken.balanceOf(user1) == rewardBefore);
     }
 
@@ -224,9 +236,11 @@ contract YieldFarmingPoolTest is Test {
     /// @dev amount is bounded to [1, 9999e18] to stay within the user1 token balance set in setUp.
     function testFuzz_stake_updatesUserAmount(uint256 amount) public {
         amount = bound(amount, 1, 9999e18);
+
         vm.startPrank(user1);
         yieldPool.stake(poolId, amount);
         vm.stopPrank();
+
         (uint256 userAmount,,) = yieldPool.userInfo(poolId, user1);
         assert(userAmount == amount);
     }
@@ -240,11 +254,14 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 100);
         uint256 balanceBefore = stakeToken.balanceOf(user1);
+
         vm.startPrank(user1);
         yieldPool.withdraw(poolId, STAKE_AMOUNT / 2);
         vm.stopPrank();
+
         assert(stakeToken.balanceOf(user1) == balanceBefore + STAKE_AMOUNT / 2);
         (uint256 amount,,) = yieldPool.userInfo(poolId, user1);
         assert(amount == STAKE_AMOUNT - STAKE_AMOUNT / 2);
@@ -255,6 +272,7 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.startPrank(user1);
         vm.expectRevert(bytes("Insuficient staked amount"));
         yieldPool.withdraw(poolId, STAKE_AMOUNT);
@@ -266,6 +284,7 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.startPrank(user1);
         vm.expectRevert(bytes("Insuficient staked amount"));
         yieldPool.withdraw(poolId, STAKE_AMOUNT * 2);
@@ -277,11 +296,14 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 100);
         uint256 rewardsBefore = rewardToken.balanceOf(user1);
+
         vm.startPrank(user1);
         yieldPool.withdraw(poolId, STAKE_AMOUNT / 2);
         vm.stopPrank();
+
         assert(rewardToken.balanceOf(user1) > rewardsBefore);
     }
 
@@ -290,7 +312,9 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 10);
+
         vm.startPrank(user1);
         vm.expectEmit(true, true, false, true);
         emit Withdrawn(poolId, user1, STAKE_AMOUNT / 2);
@@ -303,10 +327,12 @@ contract YieldFarmingPoolTest is Test {
     function testFuzz_withdraw_updatesBalance(uint256 stakeAmt, uint256 withdrawAmt) public {
         stakeAmt = bound(stakeAmt, 2, 9999e18);
         withdrawAmt = bound(withdrawAmt, 1, stakeAmt - 1);
+
         vm.startPrank(user1);
         yieldPool.stake(poolId, stakeAmt);
         yieldPool.withdraw(poolId, withdrawAmt);
         vm.stopPrank();
+
         (uint256 remaining,,) = yieldPool.userInfo(poolId, user1);
         assert(remaining == stakeAmt - withdrawAmt);
     }
@@ -320,11 +346,14 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 100);
         uint256 rewardsBefore = rewardToken.balanceOf(user1);
+
         vm.startPrank(user1);
         yieldPool.claim(poolId);
         vm.stopPrank();
+
         assert(rewardToken.balanceOf(user1) > rewardsBefore);
     }
 
@@ -341,10 +370,13 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 100);
+
         vm.startPrank(user1);
         yieldPool.claim(poolId);
         vm.stopPrank();
+
         (,, uint256 lastClaimTime) = yieldPool.userInfo(poolId, user1);
         assert(lastClaimTime == block.timestamp);
     }
@@ -354,7 +386,9 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 100);
+
         vm.startPrank(user1);
         vm.expectEmit(true, true, false, false);
         emit RewardClaimed(poolId, user1, 0);
@@ -364,18 +398,21 @@ contract YieldFarmingPoolTest is Test {
 
     /// @notice when pending rewards exceed the contract balance the transfer is capped to the available balance.
     function test_claim_capsRewardsAtContractBalance() public {
-        // Leave only 1 wei of rewards → pending >> balance → amount gets capped
         uint256 bal = rewardToken.balanceOf(address(yieldPool));
         vm.startPrank(owner);
         yieldPool.emergencyWithdraw(address(rewardToken), bal - 1);
         vm.stopPrank();
+
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 1000000);
+
         vm.startPrank(user1);
         yieldPool.claim(poolId);
         vm.stopPrank();
+
         assert(rewardToken.balanceOf(user1) == 1);
         assert(rewardToken.balanceOf(address(yieldPool)) == 0);
     }
@@ -385,14 +422,18 @@ contract YieldFarmingPoolTest is Test {
         vm.startPrank(owner);
         yieldPool.emergencyWithdraw(address(rewardToken), rewardToken.balanceOf(address(yieldPool)));
         vm.stopPrank();
+
         vm.startPrank(user1);
         yieldPool.stake(poolId, STAKE_AMOUNT);
         vm.stopPrank();
+
         vm.warp(block.timestamp + 100);
         uint256 balanceBefore = rewardToken.balanceOf(user1);
+
         vm.startPrank(user1);
         yieldPool.claim(poolId);
         vm.stopPrank();
+
         assert(rewardToken.balanceOf(user1) == balanceBefore);
     }
 
@@ -403,9 +444,11 @@ contract YieldFarmingPoolTest is Test {
     /// @notice pool.rewardRate is updated to the new value after the call.
     function test_updatePoolRewardRate_success() public {
         uint256 newRate = 2e18;
+
         vm.startPrank(owner);
         yieldPool.updatePoolRewardRate(poolId, newRate);
         vm.stopPrank();
+
         (,, uint256 rewardRate,,,) = yieldPool.pools(poolId);
         assert(rewardRate == newRate);
     }
@@ -413,6 +456,7 @@ contract YieldFarmingPoolTest is Test {
     /// @notice emits PoolUpdated with poolId and the new reward rate.
     function test_updatePoolRewardRate_emitsEvent() public {
         uint256 newRate = 2e18;
+
         vm.startPrank(owner);
         vm.expectEmit(true, false, false, true);
         emit PoolUpdated(poolId, newRate);
@@ -431,6 +475,7 @@ contract YieldFarmingPoolTest is Test {
     /// @notice reverts with "Pool is not active" for an unregistered pool id.
     function test_updatePoolRewardRate_revertsPoolNotActive() public {
         bytes32 fakePId = keccak256("fake");
+
         vm.startPrank(owner);
         vm.expectRevert(bytes("Pool is not active"));
         yieldPool.updatePoolRewardRate(fakePId, 2e18);
@@ -444,6 +489,7 @@ contract YieldFarmingPoolTest is Test {
     /// @notice returns the array of active pool ids in insertion order.
     function test_getActivePools_returnsAllPools() public view {
         bytes32[] memory all = yieldPool.getActivePools();
+
         assert(all.length == 1);
         assert(all[0] == poolId);
     }
@@ -455,6 +501,7 @@ contract YieldFarmingPoolTest is Test {
     /// @notice returns a 149-byte packed encoding: address(20) + uint256×4(128) + bool(1).
     function test_getPoolEncodedData_returnsExpectedLength() public view {
         bytes memory data = yieldPool.getPoolEncodedData(poolId);
+
         assert(data.length == 149);
     }
 
@@ -465,6 +512,7 @@ contract YieldFarmingPoolTest is Test {
     /// @notice returned hash matches keccak256(abi.encodePacked(poolId, user, "YIELD_FARMING_USER")).
     function test_getUserHash_matchesExpectedValue() public view {
         bytes32 expected = keccak256(abi.encodePacked(poolId, user1, "YIELD_FARMING_USER"));
+
         assert(yieldPool.getUserHash(poolId, user1) == expected);
     }
 
