@@ -334,4 +334,102 @@ contract YieldFarmingPoolTest is Test {
         assert(rewardToken.balanceOf(user1) == 1);
         assert(rewardToken.balanceOf(address(yieldPool)) == 0);
     }
+
+    function test_claim_skipsTransferWhenRewardBalanceZero() public {
+        vm.startPrank(owner);
+        yieldPool.emergencyWithdraw(address(rewardToken), rewardToken.balanceOf(address(yieldPool)));
+        vm.stopPrank();
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 100);
+        uint256 balanceBefore = rewardToken.balanceOf(user1);
+        vm.startPrank(user1);
+        yieldPool.claim(poolId);
+        vm.stopPrank();
+        assert(rewardToken.balanceOf(user1) == balanceBefore);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // updatePoolRewardRate
+    // ─────────────────────────────────────────────────────────────
+
+    function test_updatePoolRewardRate_success() public {
+        uint256 newRate = 2e18;
+        vm.startPrank(owner);
+        yieldPool.updatePoolRewardRate(poolId, newRate);
+        vm.stopPrank();
+        (,, uint256 rewardRate,,,) = yieldPool.pools(poolId);
+        assert(rewardRate == newRate);
+    }
+
+    function test_updatePoolRewardRate_emitsEvent() public {
+        uint256 newRate = 2e18;
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit PoolUpdated(poolId, newRate);
+        yieldPool.updatePoolRewardRate(poolId, newRate);
+        vm.stopPrank();
+    }
+
+    function test_updatePoolRewardRate_revertsNotOwner() public {
+        vm.startPrank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, attacker));
+        yieldPool.updatePoolRewardRate(poolId, 2e18);
+        vm.stopPrank();
+    }
+
+    function test_updatePoolRewardRate_revertsPoolNotActive() public {
+        bytes32 fakePId = keccak256("fake");
+        vm.startPrank(owner);
+        vm.expectRevert(bytes("Pool is not active"));
+        yieldPool.updatePoolRewardRate(fakePId, 2e18);
+        vm.stopPrank();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // getActivePools
+    // ─────────────────────────────────────────────────────────────
+
+    function test_getActivePools_returnsAllPools() public view {
+        bytes32[] memory all = yieldPool.getActivePools();
+        assert(all.length == 1);
+        assert(all[0] == poolId);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // getPoolEncodedData
+    // ─────────────────────────────────────────────────────────────
+
+    function test_getPoolEncodedData_returnsExpectedLength() public view {
+        bytes memory data = yieldPool.getPoolEncodedData(poolId);
+        // address(20) + uint256*4(128) + bool(1) = 149 bytes
+        assert(data.length == 149);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // getUserHash
+    // ─────────────────────────────────────────────────────────────
+
+    function test_getUserHash_matchesExpectedValue() public view {
+        bytes32 expected = keccak256(abi.encodePacked(poolId, user1, "YIELD_FARMING_USER"));
+        assert(yieldPool.getUserHash(poolId, user1) == expected);
+    }
+
+    function test_getUserHash_differsByUser() public view {
+        assert(yieldPool.getUserHash(poolId, user1) != yieldPool.getUserHash(poolId, user2));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // stake – restake mismo bloque (pending == 0, sin auto-claim)
+    // ─────────────────────────────────────────────────────────────
+
+    function test_stake_restakeInSameBlock_doesNotClaimRewards() public {
+        vm.startPrank(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        uint256 rewardBefore = rewardToken.balanceOf(user1);
+        yieldPool.stake(poolId, STAKE_AMOUNT);
+        vm.stopPrank();
+        assert(rewardToken.balanceOf(user1) == rewardBefore);
+    }
 }
