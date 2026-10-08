@@ -17,8 +17,8 @@ contract ABIEncoderDemo {
      * @param tokenA first pool token
      * @param tokenB second pool token
      * @param fee pool fee
-     * @return poolId identifier (unique for this pool) 
-     */ 
+     * @return poolId identifier (unique for this pool)
+     */
     function createPoolIdentifier(address tokenA, address tokenB, uint24 fee) external pure returns (bytes32 poolId) {
         // We order the tokens
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -36,7 +36,7 @@ contract ABIEncoderDemo {
      * @param minAmountOut Minimum output amount
      * @return positionId Position identifier
      * @return encodedData Encoded position data
-     */ 
+     */
     function encodeTradingPosition(address user, address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut) external view returns (bytes32 positionId, bytes memory encodedData) {
         // Encode the position data
         encodedData = abi.encodePacked(user, tokenIn, tokenOut, amountIn, minAmountOut, block.timestamp);
@@ -57,13 +57,13 @@ contract ABIEncoderDemo {
 
         // Encode the path
         bytes memory pathData;
-        for (uint i = 0; i < path.length; i++) {
+        for (uint256 i = 0; i < path.length; i++) {
             pathData = abi.encodePacked(pathData, path[i]);
         }
 
         // Encode the amounts
         bytes memory amountData;
-        for (uint i = 0; i < path.length; i++) {
+        for (uint256 i = 0; i < path.length; i++) {
             amountData = abi.encodePacked(amountData, amount[i]);
         }
 
@@ -83,11 +83,11 @@ contract ABIEncoderDemo {
      * @return orderHash Order hash
      * @return orderData Encoded order data
      */
-    function encodeLimitOrder(address maker, address taker, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut, uint256 nonce) external pure returns(bytes32 orderHash, bytes memory orderData) {
+    function encodeLimitOrder(address maker, address taker, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut, uint256 nonce) external pure returns (bytes32 orderHash, bytes memory orderData) {
         // Encode the order data
         orderData = abi.encodePacked(maker, taker, tokenIn, tokenOut, amountIn, amountOut, nonce, "LIMIT_ORDER_V1");
 
-        // Create the order hash 
+        // Create the order hash
         orderHash = keccak256(orderData);
     }
 
@@ -132,10 +132,10 @@ contract ABIEncoderDemo {
      * @param poolIds Array of pool identifiers
      * @return userHash Unique user hash
      */
-    function createUserMultiPoolHash (address user, bytes32[] calldata poolIds) external pure returns (bytes32 userHash) {
+    function createUserMultiPoolHash(address user, bytes32[] calldata poolIds) external pure returns (bytes32 userHash) {
         bytes memory data = abi.encodePacked(user);
 
-        for (uint i = 0; i < poolIds.length; i++) {
+        for (uint256 i = 0; i < poolIds.length; i++) {
             data = abi.encodePacked(data, poolIds[i]);
         }
 
@@ -157,14 +157,14 @@ contract ABIEncoderDemo {
         bytes memory nameData = abi.encodePacked(strategyName);
 
         // Encode pools
-        bytes memory poolsData; 
-        for (uint i = 0; i < pools.length; i++) {
+        bytes memory poolsData;
+        for (uint256 i = 0; i < pools.length; i++) {
             poolsData = abi.encodePacked(poolsData, pools[i]);
         }
 
-        // Encode weigths 
-        bytes memory weigthsData; 
-        for (uint i = 0; i < weigths.length; i++) {
+        // Encode weigths
+        bytes memory weigthsData;
+        for (uint256 i = 0; i < weigths.length; i++) {
             weigthsData = abi.encodePacked(weigthsData, weigths[i]);
         }
 
@@ -174,10 +174,10 @@ contract ABIEncoderDemo {
 
     /**
      * @dev Demonstrates encoding data for a cross-chain bridge
-     * @param sourceChain Source chain 
-     * @param targetChain Target chain 
+     * @param sourceChain Source chain
+     * @param targetChain Target chain
      * @param token Token to transfer
-     * @param amount Amount 
+     * @param amount Amount
      * @param recipient Recipient
      * @return bridgeData Encoded bridge data
      */
@@ -188,7 +188,7 @@ contract ABIEncoderDemo {
     /**
      * @dev Creates a unique identifier for a DeFi transaction
      * @param txType Transaction type
-     * @param user User 
+     * @param user User
      * @param timestamp Timestamp
      * @param nonce Unique nonce
      * @return txId Unique transaction identifier
